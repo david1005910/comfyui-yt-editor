@@ -1,0 +1,11 @@
+# Runtime data: models, generated clips, exports, ComfyUI DB — large, regenerable
+workspace/
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

@@ -1,0 +1,64 @@
+# ComfyUI on RTX 3060 (eGPU) — ai-dock image, GPU via Docker Desktop/WSL2
+# 사용법:
+#   cd ~/comfyui
+#   docker compose up -d        # 시작
+#   docker compose logs -f      # 로그 보기 (첫 실행 시 초기화 진행)
+#   docker compose down         # 중지
+# 웹UI:  http://localhost:8188   (이미지/동영상 생성)
+# 포털:  http://localhost:1111   (서비스 상태/로그)
+# 모델·출력물은 전부 ./workspace 에 남습니다 (컨테이너를 지워도 보존).
+
+services:
+  comfyui:
+    build: .                       # Dockerfile: ai-dock + 최신 ComfyUI(WAN 2.2 지원)
+    image: comfyui-wan:local
+    container_name: comfyui
+    restart: unless-stopped
+    ports:
+      - "8188:8188"     # ComfyUI 웹 UI
+      - "1111:1111"     # 서비스 포털
+      - "8888:8888"     # Jupyter (파일/터미널 관리, 선택)
+    environment:
+      # 로컬 전용: 인터넷 공개 터널(Cloudflare) 비활성화 — 필수 보안 설정.
+      - CF_QUICK_TUNNELS=false
+      # 로컬 전용이므로 로그인 비활성화. 외부 노출 시 true 로 바꾸고 아래 계정 설정.
+      - WEB_ENABLE_AUTH=false
+      # - WEB_USER=user
+      # - WEB_PASSWORD=changeme
+      - AUTO_UPDATE=false
+      # RTX 3060 12GB: 기본(자동 메모리 관리) 권장. VRAM 부족 시 아래 주석 해제.
+      - COMFYUI_ARGS=
+      # - COMFYUI_ARGS=--lowvram
+      # gated 모델 자동 다운로드용 토큰 (선택)
+      # - HF_TOKEN=
+      # - CIVITAI_TOKEN=
+    volumes:
+      - ./workspace:/workspace                       # ai-dock 작업영역
+      - ./workspace/models:/opt/ComfyUI/models       # 모델 영구 저장 (재생성에도 보존)
+      - ./workspace/output:/opt/ComfyUI/output       # 생성 이미지/영상 영구 저장
+      - ./workspace/input:/opt/ComfyUI/input         # 입력 이미지(I2V용)
+      - ./workspace/user:/opt/ComfyUI/user           # 저장 워크플로/UI 설정
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # AI 유튜브 영상 편집기 (웹 UI: http://localhost:8090)
+  editor:
+    build: ./editor
+    image: yt-editor:local
+    container_name: yt-editor
+    restart: unless-stopped
+    ports:
+      - "8090:8080"   # 호스트 8090 → 컨테이너 8080 (8080은 Windows에서 사용 중)
+    environment:
+      - COMFYUI_URL=http://comfyui:8188   # 같은 compose 네트워크로 ComfyUI 호출
+      - MEDIA_ROOT=/data
+    volumes:
+      - ./workspace/output:/data/output   # 생성 클립·내보내기 공유
+      - ./workspace/input:/data/input     # I2V 시작 이미지 공유 (ComfyUI input)
+    depends_on:
+      - comfyui

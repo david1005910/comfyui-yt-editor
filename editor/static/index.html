@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 유튜브 영상 편집기 · WAN 2.2</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>🎬 AI 유튜브 영상 편집기 <span class="sub">WAN 2.2 · RTX 3060</span></h1>
+  <div id="status" class="status">상태 확인 중…</div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="gen">① 생성</button>
+  <button class="tab" data-tab="lib">② 라이브러리</button>
+  <button class="tab" data-tab="edit">③ 타임라인 &amp; 내보내기</button>
+  <button class="tab" data-tab="thumb">④ 썸네일</button>
+  <button class="tab" data-tab="proj">💾 프로젝트</button>
+</nav>
+
+<main>
+  <!-- ① 생성 -->
+  <section class="panel active" id="tab-gen">
+    <div class="card">
+      <h2>AI 클립 생성</h2>
+      <div class="seg-toggle">
+        <button class="mode active" data-mode="single">단일 클립 (~1–5초)</button>
+        <button class="mode" data-mode="long">긴 영상 (구간 체이닝, 5초+)</button>
+      </div>
+      <textarea id="prompt" rows="3" placeholder="장면을 영어로 묘사하세요. 예: a red fox running through a snowy forest, cinematic, golden hour"></textarea>
+      <textarea id="negative" rows="1" placeholder="(선택) 네거티브 프롬프트 — 비워두면 기본값"></textarea>
+      <div class="row">
+        <label>해상도
+          <select id="res">
+            <option value="512x384">512×384 (가장 빠름·4:3)</option>
+            <option value="704x480" selected>704×480 (권장·3:2)</option>
+            <option value="832x480">832×480 (와이드·16:9)</option>
+            <option value="480x832">480×832 (세로·Shorts)</option>
+          </select>
+        </label>
+        <label id="lenWrap">길이
+          <select id="len">
+            <option value="25">~1초 (25f)</option>
+            <option value="49" selected>~2초 (49f)</option>
+            <option value="81">~3.4초 (81f)</option>
+            <option value="121">5초 (121f)</option>
+          </select>
+        </label>
+        <label id="secWrap" class="hidden">목표 길이
+          <select id="seconds">
+            <option value="10" selected>~10초 (2구간)</option>
+            <option value="15">~15초 (3구간)</option>
+            <option value="20">~20초 (4구간)</option>
+            <option value="30">~30초 (6구간)</option>
+          </select>
+        </label>
+        <label>스텝
+          <select id="steps">
+            <option value="8">8 (빠름)</option>
+            <option value="12" selected>12 (권장)</option>
+            <option value="20">20 (고품질)</option>
+          </select>
+        </label>
+        <label>시드 <input type="number" id="seed" value="0" title="0=무작위"></label>
+      </div>
+      <div class="row">
+        <label class="grow">시작 이미지(선택, 이미지→영상)
+          <input type="file" id="startimg" accept="image/*">
+        </label>
+        <span id="startimgName" class="muted"></span>
+      </div>
+      <button id="genBtn" class="primary">클립 생성</button>
+      <div id="genProg" class="prog hidden"></div>
+      <p class="hint" id="longHint" style="display:none">⏳ 긴 영상은 구간마다 모델을 다시 돌립니다(구간당 수십 초~수 분). 16GB RAM에서는 GGUF + 스왑으로 동작합니다.</p>
+    </div>
+  </section>
+
+  <!-- ② 라이브러리 -->
+  <section class="panel" id="tab-lib">
+    <div class="card">
+      <h2>클립 라이브러리
+        <span class="tools">
+          <label class="upbtn">＋ 영상 업로드<input type="file" id="upVideo" accept="video/*" hidden></label>
+          <button id="refreshClips" class="ghost">새로고침</button>
+        </span>
+      </h2>
+      <div id="library" class="grid"></div>
+    </div>
+    <div class="card">
+      <h2>오디오 (배경음악)
+        <span class="tools">
+          <label class="upbtn">🎵 음악 업로드<input type="file" id="upAudio" accept="audio/*" hidden></label>
+        </span>
+      </h2>
+      <div id="audioList" class="audio-list"></div>
+    </div>
+  </section>
+
+  <!-- ③ 타임라인 & 내보내기 -->
+  <section class="panel" id="tab-edit">
+    <div class="card">
+      <h2>출력 설정</h2>
+      <div class="row">
+        <label class="grow">제목/파일명 <input type="text" id="exName" value="my_youtube_video"></label>
+        <label>화면비
+          <select id="exAspect">
+            <option value="1920x1080" selected>16:9 가로 (1080p)</option>
+            <option value="1280x720">16:9 가로 (720p)</option>
+            <option value="1080x1920">9:16 세로 (Shorts)</option>
+            <option value="1080x1080">1:1 정사각</option>
+          </select>
+        </label>
+        <label>fps
+          <select id="exFps"><option>24</option><option>30</option></select>
+        </label>
+      </div>
+      <div class="row">
+        <label class="grow">배경음악
+          <select id="music"><option value="">(없음)</option></select>
+        </label>
+        <label>음악 볼륨 <input type="range" id="vol" min="0" max="1" step="0.05" value="0.6"></label>
+        <label>음악 페이드(초) <input type="number" id="musicFade" value="1.5" step="0.5" min="0"></label>
+        <label class="chk"><input type="checkbox" id="keepAudio" checked> 클립 원본 소리 유지</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>타임라인
+        <span class="tools">
+          <button id="addCard" class="ghost">＋ 타이틀 카드</button>
+          <span class="muted small">행을 드래그해 순서 변경</span>
+        </span>
+      </h2>
+      <div id="timeline" class="timeline"><p class="muted">②라이브러리에서 "타임라인 추가"를 누르거나, 위 "＋ 타이틀 카드"로 시작하세요.</p></div>
+      <div class="tl-summary" id="tlSummary"></div>
+    </div>
+
+    <div class="card">
+      <h2>유튜브용 내보내기 (mp4)</h2>
+      <button id="exportBtn" class="primary">내보내기</button>
+      <div id="exProg" class="prog hidden"></div>
+      <div id="exResult" class="result hidden"></div>
+    </div>
+  </section>
+
+  <!-- ④ 썸네일 -->
+  <section class="panel" id="tab-thumb">
+    <div class="card">
+      <h2>썸네일 생성</h2>
+      <div class="row">
+        <label class="grow">원본 클립
+          <select id="thumbClip"></select>
+        </label>
+        <label>프레임 시점(초) <input type="number" id="thumbTime" value="1" step="0.5" min="0"></label>
+      </div>
+      <div class="row">
+        <label class="grow">큰 제목 <input type="text" id="thumbTitle" placeholder="예: 충격! 이것의 정체는?"></label>
+        <label>제목 색 <input type="color" id="thumbTitleColor" value="#ffffff"></label>
+        <label>박스 색 <input type="color" id="thumbBox" value="#ff2d2d"></label>
+      </div>
+      <div class="row">
+        <label class="grow">작은 부제(선택) <input type="text" id="thumbSub" placeholder="예: 1편"></label>
+      </div>
+      <button id="thumbBtn" class="primary">썸네일 만들기</button>
+      <div id="thumbProg" class="prog hidden"></div>
+      <div id="thumbResult" class="result hidden"></div>
+    </div>
+    <div class="card">
+      <h2>썸네일 갤러리 <span class="tools"><button id="refreshThumbs" class="ghost">새로고침</button></span></h2>
+      <div id="thumbGallery" class="grid"></div>
+    </div>
+  </section>
+
+  <!-- 💾 프로젝트 -->
+  <section class="panel" id="tab-proj">
+    <div class="card">
+      <h2>현재 타임라인 저장</h2>
+      <div class="row">
+        <label class="grow">프로젝트 이름 <input type="text" id="projName" placeholder="my_project"></label>
+        <button id="projSave" class="primary">저장</button>
+      </div>
+      <p class="muted small">타임라인 클립 구성·자막·전환·출력 설정이 저장됩니다(영상 파일은 라이브러리에 그대로 있습니다).</p>
+    </div>
+    <div class="card">
+      <h2>저장된 프로젝트 <span class="tools"><button id="refreshProj" class="ghost">새로고침</button></span></h2>
+      <div id="projList" class="proj-list"></div>
+    </div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>
