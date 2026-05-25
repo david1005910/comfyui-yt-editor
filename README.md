@@ -43,6 +43,17 @@ docker compose up -d --build
 #   ComfyUI:  http://localhost:8188
 ```
 
+### 라이브러리(생성물) 저장 위치 바꾸기 (선택)
+생성된 클립·내보내기는 기본적으로 `./workspace/output` 에 저장됩니다.
+용량 큰 별도 디스크에 두려면 `.env` 로 경로만 지정하면 됩니다:
+```bash
+cp .env.example .env
+# .env 에서 LIBRARY_DIR 을 원하는 절대경로로 지정. 예:
+#   LIBRARY_DIR=/mnt/e/comfyui-library   # WSL2에서 Windows E: 드라이브
+docker compose up -d --force-recreate    # 새 경로로 다시 마운트
+```
+모델·입력 이미지는 그대로 ext4 에 유지됩니다. (이동식 USB 드라이브는 분리 시 마운트가 깨지므로 비권장.)
+
 ## 3. 사용법 (탭 순서대로)
 1. **① 생성** — 프롬프트 입력 → *단일 클립* 또는 *긴 영상(구간 체이닝)* 선택 → 해상도/길이/스텝.
    이미지를 넣으면 이미지→영상(I2V). 긴 영상은 목표 길이(초)만 고르면 구간 수를 자동 계산해 이어붙입니다.
