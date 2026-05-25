@@ -35,7 +35,7 @@ services:
     volumes:
       - ./workspace:/workspace                       # ai-dock 작업영역
       - ./workspace/models:/opt/ComfyUI/models       # 모델 영구 저장 (재생성에도 보존)
-      - ./workspace/output:/opt/ComfyUI/output       # 생성 이미지/영상 영구 저장
+      - ${LIBRARY_DIR:-./workspace/output}:/opt/ComfyUI/output   # 생성 이미지/영상 라이브러리. 다른 디스크로 옮기려면 .env 에 LIBRARY_DIR 지정
       - ./workspace/input:/opt/ComfyUI/input         # 입력 이미지(I2V용)
       - ./workspace/user:/opt/ComfyUI/user           # 저장 워크플로/UI 설정
     deploy:
@@ -58,7 +58,7 @@ services:
       - COMFYUI_URL=http://comfyui:8188   # 같은 compose 네트워크로 ComfyUI 호출
       - MEDIA_ROOT=/data
     volumes:
-      - ./workspace/output:/data/output   # 생성 클립·내보내기 공유
+      - ${LIBRARY_DIR:-./workspace/output}:/data/output   # 라이브러리 공유 (LIBRARY_DIR 미설정 시 ./workspace/output)
       - ./workspace/input:/data/input     # I2V 시작 이미지 공유 (ComfyUI input)
     depends_on:
       - comfyui
